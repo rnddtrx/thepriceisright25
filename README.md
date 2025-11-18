@@ -1,5 +1,3 @@
-# Projet Exemple 2025
-
 # Spring / Spring Boot
 
 # Nouveau projet
@@ -10,7 +8,7 @@
 * Gradle - Groovy
 * group
 * artifact
-* jdk 21 
+* jdk 21
 * java 21
 * jar
 
@@ -37,7 +35,7 @@ DB : PostgreSQL
 
 Password : sa123$
 
-Utilisez pgModeler. 
+Utilisez pgModeler.
 
 Créez une table Product
 
@@ -52,7 +50,7 @@ Créez une table Product
 
 # Spring Data / JPA / Hibernate
 
-Spring Data a été ajoué aux starters ainsi que le driver PostgreSQL. Il faut donc configurer la base de données dans `src/resources/application.properties` comme 
+Spring Data a été ajoué aux starters ainsi que le driver PostgreSQL. Il faut donc configurer la base de données dans `src/resources/application.properties` comme
 
 ### Connecter la base de donnée
 
@@ -167,13 +165,13 @@ class ProductService {
     }
 }
 ```
-Nous allons utiliser les repository dans les services. Pour cela nous allons faire ce qu'on appelle une injection de dépendance. En effet la classe service dépend du repository. Nous allons passer le repository via les paramètres du constructeur plutôt que de l'instancier dans la classe. C'est l'injection de dépendance. 
+Nous allons utiliser les repository dans les services. Pour cela nous allons faire ce qu'on appelle une injection de dépendance. En effet la classe service dépend du repository. Nous allons passer le repository via les paramètres du constructeur plutôt que de l'instancier dans la classe. C'est l'injection de dépendance.
 
 Nous verrons que cette injection de dépendance ne sera pas faites par nous mais par le IoC Container. IoC signifie inversion of control ou inversion de controle. En effet, nous laisseron le IoC container instancier le reposiory et l'injecter dans le service. Cette notion est importante à comprendre car elle révelle l'effet "magique" de spring où on ne doit pas tout instancier comme vu en OOP.
 
 Nous pouvons aussi remarquer que le paramètre est une interface et non une classe. Ceci est volontaire pour assurer un low coupling avec la dépendance. Ainsi la classe ne dépend pas de l'autre classe directement mais du contrat de l'interface.
 
-Remarquons que pour le service nous avons utilisé une classe alors que le service va être injecté. Si nous voulions garder un low coupling nous pourions créer le service comme une interface et injecter une implémentation. `interface ProductService` et `class ProductServiceImpl implements ProductService`. 
+Remarquons que pour le service nous avons utilisé une classe alors que le service va être injecté. Si nous voulions garder un low coupling nous pourions créer le service comme une interface et injecter une implémentation. `interface ProductService` et `class ProductServiceImpl implements ProductService`.
 
 # Controller classique / Thymeleaf
 Etant donné que nous développons une application web, elle accèdera aux services via un controller qui lui renverra les données sous forme de pages web.
@@ -274,9 +272,9 @@ Dans le cas d'une Single Page Application, nous utiliserons une API qui sera app
 
 La séquence d'initialisation d'une tel application est la suivante.
 * Le navigateur récupère les fichier d'initialisation de l'application
-    * Fichier HTML
-    * Fichier CSS
-    * Fichier JS
+  * Fichier HTML
+  * Fichier CSS
+  * Fichier JS
 * La page est chargée et le code JS est exécuté par le navigateur.
 * Le programme lance des requètes à l'API via les controllers.
 * Le programme récupère les réponses en Json.
@@ -312,7 +310,7 @@ Lombok permet de générer du code répétitif. (Boilerplate)
 
 * Pour JPA toujours mettre le @NoArgsConstructor
 * Eviter le @Data
-* Le @Builder permet de construire un nouvel objet facilement. 
+* Le @Builder permet de construire un nouvel objet facilement.
 
 # JPA Relationships
 
@@ -524,4 +522,43 @@ Des information pour la documentation peut être ajoutée via des annotation dan
     @ApiResponse(responseCode = "200", description = "Liste de produits renvoyée avec succès"),
     @ApiResponse(responseCode = "500", description = "Erreur interne du serveur")
 })
+```
+
+# Repository - Méthodes peronalisées
+
+## Derived Query Method
+
+La méthode de requête dérivée va générer le JPQL (voir point suivant) en se basant sur le nom de la méthode. Attention cependant à utiliser la syntaxe exacte au risque que la méthode ne fonctionne pas.
+
+```java
+public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    // get product by name derired query method
+    Product findByName(String name);
+
+}
+```
+## JPQL query (Java Persistence Query Language)
+
+Contrairement à des requêtes SQL classiques, nous faisons ici des requêtes sur les entités et non sur les tables de la DB même si la syntaxe est inspirée de SQL.
+
+```java
+public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    // get product by name jpql
+    @Query("SELECT p FROM Product p WHERE p.name = ?1")
+    Product getProductByName(String name);
+}
+```
+## Native SQL Query
+
+Quand on arrive pas à faire la requête avec le JPQL, nous pouvons utiliser les requêtes natives. Attention celles-ci peuvent dépendre de la base de donnée utilisées et donc la portabilité est limitée.
+
+```java
+public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    // get product by name native query
+    @Query(value = "SELECT * FROM products p WHERE p.name = ?1", nativeQuery = true)
+    Product getProductByNameNative(String name);
+}
 ```

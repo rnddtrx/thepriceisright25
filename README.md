@@ -508,20 +508,66 @@ OpenAPI JSON  http://localhost:8080/v3/api-docs
 
 OpenAPI YAML http://localhost:8080/v3/api-docs.yaml
 
+Vous pouvez ajouter les liens dans le log du serveur avec le fichier suivant. (Attention bien mettre ``@Component``)
+
+```
+@Component
+public class SwaggerStartupLogger {
+
+    private static final Logger log = LoggerFactory.getLogger(SwaggerStartupLogger.class);
+    private final Environment env;
+
+    public SwaggerStartupLogger(Environment env) {
+        this.env = env;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void logSwaggerUrl() {
+
+        String port = env.getProperty("local.server.port", "8080");
+
+        String swaggerUrl = "http://localhost:" + port + "/swagger-ui.html";
+        String apiUrl =     "http://localhost:" + port + "/v3/api-docs";
+
+        log.info("------------------------------------------------------------");
+        log.info("Swagger UI available at: {}", swaggerUrl);
+        log.info("OpenAPI docs available at: {}", apiUrl);
+        log.info("------------------------------------------------------------");
+    }
+}
+```
+
+## Documentation aprofondie 🤓
+
 Des information pour la documentation peut être ajoutée via des annotation dands le controller
 
 ```java
-@Tag(name = "Products", description = "Endpoints CRUD pour les produits")
-
-@Operation(
-    summary = "Récupère tous les produits",
-    description = "Retourne la liste complète des produits enregistrés dans la base de données."
-)
-
-@ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Liste de produits renvoyée avec succès"),
-    @ApiResponse(responseCode = "500", description = "Erreur interne du serveur")
-})
+    @GetMapping("/page")
+    //Documentation OpenAPI : Description du endpoint
+    @Operation(
+            summary = "Get list of products with pagination",
+            description = "Retrieve a paginated list of products with their prices."
+    )
+    // Desription des réponses
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Paginated list",
+                    content = @Content(schema = @Schema(implementation = ProductWithPricePage.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Server error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            //Pas de 404 mais page vide si n'existe pas
+    })
+    public PageResponse<ProductWithPriceDto> findAll(@ParameterObject Pageable pageable) {
+        return new PageResponse<>(productService.getProductWithPricePage(pageable));
+    }
+```
+Les endpoints sont regroupés par controlleur par defaut mais peuvent être regroupés différemment avec l'annotation ``@Tag``
+```java
+@RestController
+@RequestMapping("/api/products")
+@Tag(name = "Products", description = "Products management API")
+class ProductRestController
 ```
 
 # Repository - Méthodes peronalisées
@@ -562,3 +608,128 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Product getProductByNameNative(String name);
 }
 ```
+# Exceptions 🤓
+
+En cas d'erreur pour ne pas retourner les erreurs générique nous pouvons ajouter un gestionnaire d'exceptions.
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    //Si exception ResourceNotFoundException dans le controlleur => handleNotFound exécutée.
+    //Attention mettre @ResponseStatus(HttpStatus.NOT_FOUND) pour avoir un status 404 et non 200
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNotFound(ResourceNotFoundException ex) {
+        return new ErrorResponse(404, ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleBadRequest(IllegalArgumentException ex) {
+        return new ErrorResponse(400, ex.getMessage());
+    }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleUnknown(Exception ex) {
+        return new ErrorResponse(500, "Internal server error");
+    }
+}
+```
+
+Nous définissons le format de notre réponse d'erreur avec la classe suivante.
+
+```java
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Error response")
+public class ErrorResponse {
+
+    @Schema(example = "404")
+    public int status;
+
+    @Schema(example = "Product not found")
+    public String message;
+
+    public ErrorResponse(int status, String message) {
+        this.status = status;
+        this.message = message;
+    }
+}
+```
+Nous ajoutons une exception pour le Not Found qui hérite de la RuntimeException.
+
+```java
+public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String message) {
+        super(message);
+    }
+}
+```
+# Fun et utile : Personaliser le banner de démarrage et les logs 🤓
+
+## Bnner
+
+Le banner de spring peut être remplacé par un texte placé dans ``src/main/resources/banner.txt``
+
+Pour une version personnalisée et conserver le banner de spring vous pouver utiliser le composant suivant.
+
+Il ajoute également l'indication de l'url de SwaggerUI et de l'APIDoc en utilisant le composant SwaggerStartupLogger vu avant.
+
+```java
+package be.ipam.thepriceisright.config;
+
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class StartupLogger {
+
+    private final SwaggerStartupLogger swaggerStartupLogger;
+
+    public StartupLogger(SwaggerStartupLogger swaggerStartupLogger) {
+        this.swaggerStartupLogger = swaggerStartupLogger;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartup() {
+
+        System.out.println();
+        System.out.println("==============================================");
+        System.out.println("  \uD83C\uDF40 The Price Is Right - Application Started  ");
+        System.out.println("==============================================");
+
+        System.out.println("""
+                ___________.__                          .__               .__                .__       .__     __  \s
+                \\__    ___/|  |__   ____   _____________|__| ____  ____   |__| ______ _______|__| ____ |  |___/  |_\s
+                  |    |   |  |  \\_/ __ \\  \\____ \\_  __ \\  |/ ___\\/ __ \\  |  |/  ___/ \\_  __ \\  |/ ___\\|  |  \\   __\\
+                  |    |   |   Y  \\  ___/  |  |_> >  | \\/  \\  \\__\\  ___/  |  |\\___ \\   |  | \\/  / /_/  >   Y  \\  | \s
+                  |____|   |___|  /\\___  > |   __/|__|  |__|\\___  >___  > |__/____  >  |__|  |__\\___  /|___|  /__| \s
+                                \\/     \\/  |__|                 \\/    \\/          \\/           /_____/      \\/     \s
+                """);
+
+        System.out.println("=====================================================================");
+        System.out.println("\uD83D\uDCD3 Swagger UI available at: " + swaggerStartupLogger.getSwaggerUIUrl());
+        System.out.println("\uD83C\uDF10 OpenAPI docs available at: " + swaggerStartupLogger.getApiDocsUrl());
+        System.out.println("=====================================================================");
+    }
+}
+```
+
+## Logs
+
+``logging.level.root=OFF`` Supprime tout les logs sauf le banner.
+
+``logging.level.be.ipam.thepriceisright=INFO`` Ajoute les logs INFO de l'application uniquement.
+
+# Evaluation formative
+
+* Créer le projet avec connection à la base de donnée
+* Créer le modèle + DB (Code first ou DB first)
+* Faire les différentes couches pour une entité
+  * Repository
+  * Service
+  * Controller (Avec DTO donc avec Mappers)
+* Tester avec SwaggerUI / Postman
+* Ajouter sur Github en privé

@@ -6,6 +6,8 @@ import be.ipam.thepriceisright.mappers.ProductMapper;
 import be.ipam.thepriceisright.mappers.ProductWithPriceMapper1;
 import be.ipam.thepriceisright.models.Product;
 import be.ipam.thepriceisright.repositories.ProductRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -42,5 +44,11 @@ public class ProductService {
         Product product = productMapper.toEntity(productDto);
         product = productRepository.save(product);
         return productMapper.toDto(product);
+    }
+
+    //Exemple de pagination
+    public Page<ProductWithPriceDto> getProductWithPricePage(Pageable pageable) {
+        return productRepository.findAll(pageable)
+                .map(productWithPriceMapper::toDto);
     }
 }

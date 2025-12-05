@@ -1,11 +1,9 @@
 package be.ipam.thepriceisright.controllers;
 
 import be.ipam.thepriceisright.exceptions.ErrorResponse;
-import be.ipam.thepriceisright.dto.pagination.PageResponse;
 import be.ipam.thepriceisright.dto.ProductDto;
 import be.ipam.thepriceisright.dto.ProductWithPriceDto;
 import be.ipam.thepriceisright.dto.pagination.ProductWithPricePage;
-import be.ipam.thepriceisright.models.Product;
 import be.ipam.thepriceisright.services.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -16,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,13 +25,42 @@ import java.util.List;
 class ProductRestController {
     private final ProductService productService;
 
+    // Constructeur et Injection
     public ProductRestController(ProductService productService) {
         this.productService = productService;
     }
 
     //CRUD
+    //READ by id
+    @GetMapping("/{id}")
+    public ProductDto findById(@PathVariable("id") Long id) {
+        return productService.getProductById(id);
+    }
 
-    //* Read
+    //READ by name
+    @GetMapping("/by-name/{name}")
+    public ProductDto findByName(@PathVariable("name") String name) {
+        return productService.getProductByName(name);
+    }
+
+    //CREATE
+    @PostMapping()
+    public ProductDto save(@RequestBody ProductDto productDto) {
+        return productService.addProduct(productDto);
+    }
+
+    //UPDATE
+    @PutMapping("/{id}")
+    public ProductDto update(@PathVariable("id") Long id, @RequestBody ProductDto productDto) {
+        return productService.updateProduct(id, productDto);
+    }
+
+    //DELETE
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT) // 204
+    public void deleteById(@PathVariable("id") Long id) {
+        productService.deleteProductById(id);
+    }
 
     //Liste complète des produits :
     // Attention : peut être lourd si beaucoup de produits
@@ -61,18 +89,5 @@ class ProductRestController {
     })
     public Page<ProductWithPriceDto> findAll(@ParameterObject Pageable pageable) {
         return productService.getProductWithPricePage(pageable);
-    }
-
-    //Recherche d'un produit par son id
-    @GetMapping("/{id}")
-    public Product findById(@PathVariable("id") Long id) {
-        return productService.getProductById(id);
-    }
-
-    //Create
-    @PostMapping()
-    public ProductDto save(@RequestBody ProductDto productDto) {
-        ProductDto product = productService.addProduct(productDto);
-        return product;
     }
 }

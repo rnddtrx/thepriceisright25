@@ -22,9 +22,11 @@ public class Price {
 
     @ManyToOne
     @JoinColumn(name = "product_id", nullable = false)
-    @JsonIgnore
-
     private Product product;
+
+    @ManyToOne
+    @JoinColumn(name = "shop_id", nullable = false)
+    private Shop shop;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal value;

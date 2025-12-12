@@ -137,4 +137,9 @@ public class ProductService {
                 .stream().map(productWithPriceMapper::toDto)
                 .toList();
     }
+
+    public Page<ProductDto> findByShop(Long shopId, Pageable pageable) {
+        return productRepository.findByShopId(shopId, pageable)
+                .map(productMapper::toDto);
+    }
 }

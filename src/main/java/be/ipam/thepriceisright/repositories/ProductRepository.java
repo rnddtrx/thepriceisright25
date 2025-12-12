@@ -1,8 +1,11 @@
 package be.ipam.thepriceisright.repositories;
 
 import be.ipam.thepriceisright.models.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -21,5 +24,21 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // get product by name native query
     @Query(value = "SELECT * FROM products p WHERE p.name = ?1", nativeQuery = true)
     Optional<Product> getProductByNameNative(String name);
+
+    @Query(
+            value = """
+            select distinct p
+            from Product p
+            join p.prices pr
+            where pr.shop.id = :shopId
+        """,
+            countQuery = """
+            select count(distinct p.id)
+            from Product p
+            join p.prices pr
+            where pr.shop.id = :shopId
+        """
+    )
+    Page<Product> findByShopId(@Param("shopId") Long shopId, Pageable page);
 
 }

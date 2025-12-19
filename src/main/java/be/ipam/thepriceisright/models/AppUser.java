@@ -23,6 +23,12 @@ public class AppUser {
     private String email;
     @Column
     private String password;
+    @ManyToMany
+    @JoinTable(
+            name = "app_user_app_role",
+            joinColumns = @JoinColumn(name = "app_user_id"),
+            inverseJoinColumns = @JoinColumn(name = "app_role_id"))
+    private Set<AppRole> appRoles;
     @OneToMany(cascade = CascadeType.ALL)
     private Set<ProductList> products;
 

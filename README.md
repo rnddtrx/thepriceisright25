@@ -733,3 +733,151 @@ public class StartupLogger {
   * Controller (Avec DTO donc avec Mappers)
 * Tester avec SwaggerUI / Postman
 * Ajouter sur Github en privé
+
+# Spring Security
+
+Pour sécuriser l'application, nous utiliserons Spring Security.
+
+Nous devons premièrement ajouter le starter Spring Security à Gradle.
+
+```java
+implementation 'org.springframework.boot:spring-boot-starter-security'
+```
+
+Dans notre application nous devons créer les entitiés AppUser et Role 
+selon les besoins de l'application. Ce sont les utilisateurs et roles de l'application 
+et non de Spring Security. Il seront convertis en UserDetails (User Spring) et GrantedAuthority (Role Sping) 
+par le UserDetailsService.
+
+Les fichier nécessaire à la configation de spring sont placé dans le package
+config.security.
+
+## SecurityConfig
+
+La configuration de Spring Security est faite dans le fichier suivant :
+* SecurityConfig.java : Configuration de Spring Security
+  * annotation @onfiguration : Indique que c'est une classe de configuration
+  * annottation @EnableMethodSecurity : Permet l'utilisation des annotations de sécurité au niveau des méthodes.
+
+Le bean SecurityFilterChain configure les règles de sécurité :
+
+```java
+            http.csrf(csrf -> csrf.disable())
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/appusers/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
+                )
+                .userDetailsService(userDetailsService)
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+```
+Détails de la filter chain :
+* Désactivation du CSRF (Cross-Site Request Forgery) car nous utilisons des tokens JWT.
+* La gestion de session est définie comme stateless, ce qui signifie que le serveur ne stocke pas d'état de session entre les requêtes.
+* Les requêtes vers les endpoints Swagger et l'API d'authentification sont autorisées sans authentification.
+* Les requêtes vers les endpoints d'administration nécessitent le rôle ADMIN.
+* Toutes les autres requêtes nécessitent une authentification.
+* Le service UserDetailsService est utilisé pour charger les détails de l'utilisateur
+* Le filtre JWT est ajouté avant le filtre d'authentification standard de Spring Security pour traiter les tokens JWT.
+
+```java
+  @Bean
+  public AuthenticationManager authenticationManager(
+  AuthenticationConfiguration authenticationConfiguration
+  ) throws Exception {
+    return authenticationConfiguration.getAuthenticationManager();
+  }
+````
+
+## PasswordEncoderConfig
+Pour le chiffrement des mots de passe, nous utilisons BCryptPasswordEncoder. Cette classe de configuration définit un bean PasswordEncoder qui sera utilisé par Spring Security pour hasher et vérifier les mots de passe des utilisateurs.
+```java
+# PasswordEncoderConfig.java
+package be.ipam.thepriceisright.config.security;
+@Configuration
+public class PasswordEncoderConfig {
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+```
+Le password encoder doit être utilisé lors de la création des utilisateurs pour hasher les mots de passe avant de les stocker en base de données.
+Il est également utilisé par Spring Security pour vérifier les mots de passe lors de l'authentification.
+
+## JwtService
+Le JwtService est responsable de la génération des tokens JWT (JSON Web Tokens). Il utilise la bibliothèque jjwt pour créer des tokens signés avec une clé secrète.
+
+## JwtFilter
+Le JwtFilter est un filtre de servlet qui intercepte les requêtes HTTP entrantes pour extraire et valider le token JWT. Si le token est valide, il configure le contexte de sécurité de Spring avec les informations de l'utilisateur.
+Il hérite de la classe abstraite OncePerRequestFilter.
+
+## AppUserDetailsService
+Le AppUserDetailsService implémente l'interface UserDetailsService de Spring Security. Il est responsable de charger les détails de l'utilisateur (Utilisateur Spring) à partir de la base de données en utilisant le service AppUserService (Utilisateur de l'application).
+
+Dans la méthode loadUserByUsername, il recherche l'utilisateur par son email. 
+Si l'utilisateur est trouvé, il retourne une instance de AppUserDetails qui encapsule les informations de l'utilisateur. 
+Si l'utilisateur n'est pas trouvé, il lance une exception UsernameNotFoundException.
+
+## AppUserDetails
+Le AppUserDetails implémente l'interface UserDetails de Spring Security. Il encapsule les informations de l'utilisateur de l'application (AppUser) et fournit les détails nécessaires à Spring Security pour l'authentification et l'autorisation.
+
+```java
+public class AppUserDetails implements UserDetails {
+
+    private final AppUser user;
+
+    public AppUserDetails(AppUser user) {
+        this.user = user;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return user.getAppRoles().stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public String getPassword() {
+        return user.getPassword();
+    }
+
+    @Override
+    public String getUsername() {
+        return user.getEmail();
+    }
+
+    @Override
+    public boolean isAccountNonExpired() { return true; }
+
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+
+    @Override
+    public boolean isEnabled() { return true; }
+
+    public AppUser getUser() {
+        return user;
+    }
+}
+```
+Le AppUserDetails mappe les rôles de l'utilisateur de l'application (AppRole) aux autorités Spring Security (GrantedAuthority) en préfixant les noms des rôles avec "ROLE_".
+Il permet aussi de récupérer le mot de passe hashé et le nom d'utilisateur.
+
+Les autres méthhodes sont implémentées en renvoyant toujours true pour simplifier l'exemple.
+
+
+
